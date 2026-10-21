@@ -1499,12 +1499,50 @@ async function admUsers(body) {
   let us; try { us = await rpc('kh_users'); } catch (e) { return put(body, h('div', { class: 'err' }, e.message)); }
   const again = () => admUsers(body);
   put(body, h('div', { class: 'toolbar', style: { marginBottom: '12px' } }, h('span', { class: 'muted small grow' }, 'أضيفي كل معلمة باسمها وآخر أربعة أرقام من هويتها، فتدخل بهذه الأرقام وحدها ويُسجَّل ما تمنحه باسمها. الأرقام تُحفظ مشفّرة ولا تُعرض بعد الحفظ. إيقاف المعلمة يمنع دخولها ويُبقي ما منحته.'),
+      h('button', { class: 'btn', onClick: () => dlgUsersBulk(again) }, svg(IC.list, 15), 'إضافة مجموعة'),
       h('button', { class: 'btn primary', onClick: () => dlgUser(null, again) }, svg(IC.plus, 15), 'إضافة معلمة / إدارية')),
     h('div', { class: 'scroll' }, h('table', { class: 't' }, h('thead', null, h('tr', null, ['الاسم', 'الصفة', 'رقم الدخول', 'الحالة', 'عدد ما منحته', ''].map(x => h('th', null, x)))),
       h('tbody', null, us.map(u => h('tr', null, h('td', { style: { fontWeight: 600 } }, u.name), h('td', null, h('span', { class: 'tag' + (u.role === 'counselor' ? ' gold' : '') }, u.role === 'teacher' && u.staff ? 'إدارية' : ROLES[u.role]), u.discipline ? h('span', { class: 'tag ok', style: { marginInlineStart: '6px' } }, 'مسؤولة الانضباط') : null, u.activity ? h('span', { class: 'tag', style: { marginInlineStart: '6px', background: '#fdeada', color: '#9a4a10' } }, 'مسؤولة النشاط') : null),
         h('td', null, u.role !== 'teacher' ? h('span', { class: 'muted small' }, 'كلمة مرور') : h('span', { class: 'tag ' + (u.has_pin ? 'ok' : 'off') }, u.has_pin ? 'معيّن' : 'غير معيّن — لا تستطيع الدخول')),
         h('td', null, h('span', { class: 'tag ' + (u.active ? 'ok' : 'off') }, u.active ? 'فعّال' : 'موقوف')), h('td', { class: 'num' }, u.records),
         h('td', { style: { textAlign: 'end' } }, u.role === 'display' ? null : h('button', { class: 'btn sm', onClick: () => dlgUser(u, again) }, svg(IC.edit, 14), 'تعديل'))))))));
+}
+// إضافة مجموعة: كل سطر = الاسم ثم آخر أربعة أرقام من الهوية
+function parseUserLines(t) {
+  return t.split(/\n+/).map(l => l.trim()).filter(Boolean).map(l => {
+    const n = l.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[\s\-–—:،,|.]+$/, ''), m = n.match(/^(.*?)[\s\-–—:،,|\t]*([0-9]{4,6})\s*$/) || n.match(/^\s*([0-9]{4,6})[\s\-–—:،,|\t]*(.+)$/);
+    if (!m) return { line: l, err: 'لم أجد أربعة أرقام في السطر' };
+    const [name, pin] = /^[0-9]/.test(m[1]) ? [m[2], m[1]] : [m[1], m[2]];
+    return { line: l, name: name.replace(/[\s\-–—:،,|]+$/, '').trim(), pin };
+  });
+}
+function dlgUsersBulk(done) {
+  let staff = false;
+  const eb = h('div'), ta = h('textarea', { rows: 7, placeholder: 'أ. نورة الغامدي 4821\nأ. هدى الزهراني 7310\nأ. منيرة القحطاني 5512', style: { width: '100%', font: 'inherit', fontSize: '17px', lineHeight: '1.8', padding: '10px 12px', borderRadius: '12px', border: '1.5px solid var(--line)', resize: 'vertical' } });
+  const info = h('div', { class: 'small muted' }), res = h('div');
+  const kindBox = h('div'); const drawKind = () => put(kindBox, h('div', { class: 'field' }, h('span', null, 'صفة الجميع في هذه القائمة'), h('div', { class: 'seg', style: { display: 'flex' } },
+    [[false, 'معلمات'], [true, 'إداريات']].map(([v, l]) => h('button', { type: 'button', class: staff === v ? 'on' : '', style: { flex: '1' }, onClick: () => { staff = v; drawKind(); } }, l)))));
+  drawKind();
+  const count = () => { const rows = parseUserLines(ta.value), ok = rows.filter(r => !r.err).length; put(info, rows.length ? `${ok} جاهزة للإضافة` + (rows.length - ok ? ` · ${rows.length - ok} تحتاج تصحيح` : '') : 'اكتبي أو الصقي القائمة: كل سطر فيه الاسم ثم آخر أربعة أرقام من الهوية.'); };
+  ta.addEventListener('input', count); count();
+  const go = h('button', { class: 'btn primary', onClick: async () => {
+    const rows = parseUserLines(ta.value); if (!rows.length) return formErr(eb, 'القائمة فارغة');
+    go.disabled = true; put(eb); const out = [], left = [];
+    for (const r of rows) {
+      if (r.err) { out.push({ r, ok: false, msg: r.err }); left.push(r.line); continue; }
+      try { await rpc('kh_user_save', { p_id: null, p_name: r.name, p_pin: r.pin, p_active: true, p_staff: staff }); out.push({ r, ok: true }); }
+      catch (e) { out.push({ r, ok: false, msg: e.message }); left.push(r.line); }
+    }
+    const nOk = out.filter(x => x.ok).length;
+    put(res, h('div', { class: 'card pad', style: { marginTop: '10px', display: 'grid', gap: '6px' } }, h('b', null, `أُضيفت ${nOk} من ${out.length}`),
+      out.map(x => h('div', { class: 'row', style: { gap: '8px', alignItems: 'flex-start', color: x.ok ? 'var(--teal-d)' : '#b42318' } }, svg(x.ok ? IC.check : IC.x, 16), h('span', null, x.ok ? x.r.name : `${x.r.line} — ${x.msg}`)))));
+    ta.value = left.join('\n'); count(); go.disabled = false; done();
+    if (nOk) toast(`أُضيفت ${nOk}` + (left.length ? ` — وبقيت ${left.length} للتصحيح` : ''));
+  } }, 'إضافة الجميع');
+  dialog({ title: 'إضافة مجموعة معلمات أو إداريات', sub: 'كل سطر: الاسم ثم آخر أربعة أرقام من الهوية. يمكن اللصق من ملاحظات أو Excel.', wide: true,
+    body: [eb, kindBox, ta, info, h('p', { class: 'tiny muted', style: { margin: '6px 0 0' } }, 'تكليف الانضباط أو النشاط يكون بعدها من زر «تعديل» بجانب الاسم. الأسطر التي فيها خطأ تبقى في الخانة لتصحيحها.'), res],
+    footer: [go] });
+  setTimeout(() => ta.focus(), 50);
 }
 function dlgUser(u, done) {
   const T = !u || u.role === 'teacher';
