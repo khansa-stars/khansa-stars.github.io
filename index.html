@@ -447,6 +447,59 @@ th.behcol,td.behcol{text-align:center;padding-inline:10px;white-space:nowrap}
 .behgrp h4{margin:0 0 2px;font-size:16.5px;color:#7a5200;display:flex;align-items:center;gap:8px}
 .behgrp h4 .no{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#e3a116;color:#fff;font-size:13px}
 .behgrp .indbtn{padding:8px 10px;font-size:14.5px;min-height:0}
+
+/* طباعة التقارير المقسّمة (أفقي، رأس متكرر في كل صفحة) */
+#printArea{display:none}
+@media print{
+  body.print-rep > *:not(#printArea){display:none!important}
+  body.print-rep #printArea{display:block}
+  body.print-rep{background:#fff!important}
+  #printArea{font-family:var(--font);color:#000;direction:rtl;text-align:right}
+  .pp-m{direction:rtl}
+  .pp{break-after:page;page-break-after:always;height:186mm;width:100%;display:flex;flex-direction:column;overflow:hidden}
+  .pp:last-child{break-after:auto;page-break-after:auto}
+  .pp-h{display:flex;justify-content:space-between;align-items:flex-end;gap:10mm;border-bottom:.6mm solid #000;padding-bottom:2mm;margin-bottom:2.5mm}
+  .pp-t{font-size:17pt;display:block;line-height:1.2} .pp-c{font-size:14pt;font-weight:700;line-height:1.3}
+  .pp-m{font-size:9.5pt;text-align:left;line-height:1.35;color:#222}
+  table.pt{width:100%;table-layout:fixed;border-collapse:collapse;font-size:11pt}
+  .pt th,.pt td{border:.25mm solid #555;padding:1mm .6mm;text-align:center;vertical-align:middle;overflow-wrap:anywhere}
+  .pt td{overflow:hidden}
+  .pt thead th{background:#ececec!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:8pt;line-height:1.2;font-weight:700;vertical-align:bottom;padding-bottom:1.2mm}
+  .pt td{height:7.4mm;line-height:1.2}
+  .pp.pr .pt td{height:6.3mm;padding-top:.4mm;padding-bottom:.4mm}
+  .pt th.nm,.pt td.nm{text-align:right;padding-inline:1.5mm}
+  .pt td.nm{font-weight:700;font-size:10.5pt}
+  .pt .fin{background:#f6f0dc!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-weight:700;font-size:12pt}
+  .pt thead th.fin{font-size:8.6pt}
+  .pt tbody tr:nth-child(even) td{background:#fafafa!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pt tbody tr:nth-child(even) td.fin{background:#f1e9cf!important}
+  .pno{display:block;font-size:8pt;color:#555;font-weight:400}
+  .pp-n{font-size:9pt;margin:1.5mm 0 0;color:#333}
+  .pdeg{display:block;font-size:7.5pt;color:#7a5200;font-weight:700;margin-top:.6mm}
+  .pp-leg{margin-top:1.5mm;border:.25mm solid #999;border-radius:1.5mm;padding:1.2mm 2.5mm;font-size:7.9pt;line-height:1.3}
+  .pp-leg>b{font-size:9pt}
+  .pp-leg ol{list-style:none;margin:1mm 0 0;padding:0;columns:3;column-gap:5mm}
+  .pp-leg li{break-inside:avoid;margin-bottom:.8mm;display:flex;gap:1.5mm}
+  .lno{font-weight:700;flex:none;min-width:7mm}
+  .pp-f{margin-top:auto;display:flex;justify-content:space-between;font-size:10pt;padding-top:1.5mm;flex:none}
+  tr{break-inside:avoid;page-break-inside:avoid}
+}
+
+/* تفصيل الممارسات في تبويب الدرجات */
+.pguide{margin-top:10px;border:1.5px solid #ffdfa8;background:#fffaf0;border-radius:16px;padding:6px 14px 10px}
+.pguide summary{display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 0;list-style:none;color:#7a5200}
+.pguide summary::-webkit-details-marker{display:none}
+.pguide summary b{font-size:16.5px}
+.pguide ol{list-style:none;margin:6px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:6px 14px}
+.pguide li{display:flex;gap:8px;align-items:flex-start;font-size:15px;line-height:1.55;background:#fff;border:1px solid #f6e3bd;border-radius:10px;padding:6px 10px}
+.pg-no{flex:none;display:inline-grid;place-items:center;min-width:34px;height:24px;border-radius:8px;background:#f2a93b;color:#fff;font-weight:700;font-size:13.5px;margin-top:2px}
+.pg-hno{display:inline-grid;place-items:center;min-width:30px;height:20px;border-radius:6px;background:#f2a93b;color:#fff;font-size:12.5px;font-weight:700;margin-bottom:3px}
+@media print{.pguide{display:none}}
+
+/* تبويب الدرجات: الصياغة الكاملة لكل ممارسة داخل رأس عمودها */
+.grid th.item.pfull{min-width:150px;max-width:170px;width:160px;vertical-align:bottom;padding:8px 8px}
+.grid th.item.pfull .pg-hno{display:inline-grid;margin-bottom:4px}
+.grid th.item.pfull .pg-ht{display:block;font-size:13.5px;line-height:1.5;font-weight:600;color:var(--ink);white-space:normal}
 </style>
 </head>
 <body>
@@ -966,7 +1019,7 @@ function renderRecord(main) {
     put(tabsBox, isStaff() ? null : [
       h('button', { class: 'tab' + (!isGrades() ? ' on' : ''), onClick: () => { S.sec = 'points'; drawTabs(); S.paint(); } }, h('span', { class: 'ic' }, lic('star', 42)), h('span', null, h('b', null, 'النقاط'), h('span', null, `${ptsWord(b.award)} لكل منحة — رصيد المعلمة ${b.limit} نقطة في الأسبوع`))),
       h('button', { class: 'tab gold' + (isGrades() ? ' on' : ''), onClick: () => { S.sec = 'grades'; drawTabs(); S.paint(); } }, h('span', { class: 'ic' }, lic('shield', 42)), h('span', null, h('b', null, 'درجات السلوك المتميز'), h('span', null, `الدرجات الرسمية — بحد أعلى ${S.cap} درجة في الفصل الدراسي`)))]);
-    put(catBox, isGrades() ? h('p', { class: 'note small', style: { margin: 0 } }, 'السلوك المتميز يُرصد هنا بالدرجات الرسمية فقط (بحد أعلى ' + S.cap + ' في الفصل الدراسي)، ولا يمنح نقاطًا ولا يُحسب من رصيد المعلمة.') :
+    put(catBox, isGrades() ? [h('p', { class: 'note small', style: { margin: 0 } }, 'السلوك المتميز يُرصد هنا بالدرجات الرسمية فقط (بحد أعلى ' + S.cap + ' في الفصل الدراسي)، ولا يمنح نقاطًا ولا يُحسب من رصيد المعلمة.')] :
       h('div', { class: 'catbar' },
         [{ id: 'all', name: 'الكل', c: '#0f9a82', t: '#fff' }, ...CATS.filter(c => !isStaff() || c.id === 'values' || c.id === 'activity' || (c.id === 'discipline' && isDisc()))].map(c => h('button', { class: 'catchip' + (S.cat === c.id ? ' on' : ''), title: c.hint || '', style: S.cat === c.id ? { background: c.c, color: c.t } : null,
           onClick: () => { S.cat = c.id; drawTabs(); S.paint(); } }, lic(c.ic || 'spark', 30), c.name)),
@@ -1034,6 +1087,13 @@ function pickBehavior(st) {
   const dl = dialog({ title: 'سلوك إيجابي — ' + st.name.split(' ').slice(0, 3).join(' '), sub: 'اضغطي التصرف الذي لاحظتِه، وتُحسب النقطتان لقيمته', wide: true, body,
     footer: [h('span', { class: 'tiny muted' }, 'للمنح بتاريخ سابق أو مع ملاحظة: اضغطي العدد تحت القيمة في الجدول.')] });
 }
+// تفصيل ممارسات السلوك المتميز ظاهر للمعلمة وقت الرصد (الرقم نفسه أعلى كل عمود)
+function practGuide() {
+  const d = h('details', { class: 'pguide', open: S.pgOpen !== false }, h('summary', null, lic('shield', 24), h('b', null, 'تفصيل ممارسات السلوك المتميز ودرجاتها'), h('span', { class: 'tiny muted' }, '(اضغطي للإخفاء أو الإظهار)')),
+    h('ol', null, itemsOf('practice').map(it => h('li', null, h('span', { class: 'pg-no num' }, it.id), h('span', { class: 'pg-tx' }, it.name + (/درج/.test(it.name) ? '' : ` (${it.grp})`))))));
+  d.addEventListener('toggle', () => { S.pgOpen = d.open; });
+  return d;
+}
 // اختيار المؤشر الملاحظ ثم المنح بلمسة واحدة
 function pickIndicator(st, it) {
   const c = catOf(it.cat) || CATS[0];
@@ -1064,7 +1124,7 @@ function buildGrid() {
   const title = `${classLabel(cls(S.classId))} — ${sts.length} طالبة`;
   head.push(h('tr', { class: 'heads' + (isG || c ? ' under' : '') }, h('th', { class: 'namecol' }, title), beh ? h('th', { class: 'item behcol' }, 'المنح') : null,
     all ? CATS.map(x => h('th', { class: 'item', style: { borderBottom: '4px solid ' + x.c } }, lic(x.ic, 30), h('br'), x.name)) :
-      items.map((it, i) => h('th', { class: 'item' + (isG || items.length > 9 ? ' p' : ''), title: it.name }, S.cat === 'values' && !isG ? [h('span', { class: 'no num' }, i + 1), h('br')] : null, it.short)),
+      items.map((it, i) => h('th', { class: 'item' + (isG ? ' pfull' : items.length > 9 ? ' p' : ''), title: it.name }, S.cat === 'values' && !isG ? [h('span', { class: 'no num' }, i + 1), h('br')] : isG ? [h('span', { class: 'pg-hno num' }, it.id), h('span', { class: 'pg-ht' }, it.name)] : null, isG ? null : it.short)),
     h('th', { class: 'tot' }, isG ? 'الدرجة' : 'نقاط الفترة')));
   const buildRow = (st, i) => h('tr', { id: 'row-' + st.id, class: S.hl === st.id ? 'hl' : '' },
     h('td', { class: 'namecol' }, h('button', { title: 'فتح بطاقة الطالبة', onClick: () => openStudent(st) }, h('span', { class: 'ix num' }, i + 1), h('span', { class: 'nm' }, st.name))),
@@ -1093,7 +1153,7 @@ function buildList() {
     h('div', { class: 'card' },
       all ? h('div', { class: 'itemhead' }, h('div', null, h('b', null, 'مجموع النقاط في الفترة'), h('div', { style: { marginTop: '6px' } }, legend()))) :
       behL ? h('div', { class: 'itemhead', style: { borderTop: '4px solid ' + c.c } }, h('div', null, h('b', null, c.name), h('div', { class: 'tiny muted' }, 'اضغطي «سلوك إيجابي» بجانب الطالبة واختاري التصرف')), h('span', { class: 'badge', style: { background: c.c, color: c.t } }, ptsWord((S.budget || {}).award || 2) + ' لكل منحة')) :
-      h('div', { class: 'itemhead', style: c ? { borderTop: '4px solid ' + c.c } : null }, h('div', null, h('b', null, it.short), h('div', { class: 'tiny muted' }, isG || it.name !== it.short ? it.name : classLabel(cls(S.classId)))),
+      h('div', { class: 'itemhead', style: c ? { borderTop: '4px solid ' + c.c } : null }, h('div', null, h('b', null, isG ? it.id + ' · ' + it.short : it.short), isG ? h('div', { class: 'tiny', style: { color: '#7a5200', lineHeight: '1.45', marginTop: '2px' } }, it.name) : null, h('div', { class: 'tiny muted' }, isG || it.name !== it.short ? it.name : classLabel(cls(S.classId)))),
         isG ? h('span', { class: 'badge ' + (it.once ? 'band6' : bandOf(it)) }, it.grp) : h('span', { class: 'badge', style: { background: c.c, color: c.t } }, c.name)),
       h('div', { class: 'slist' }, sts.length ? sts.map(buildRow) : h('div', { class: 'pad muted' }, 'لا توجد طالبات في هذا الفصل.'))));
 }
@@ -1330,8 +1390,8 @@ function renderReports(main) {
     const { sum, recs } = data, rows = sum.rows, r = range();
     const btns = h('div', { class: 'row noprint', style: { marginBottom: '10px' } },
       h('div', { class: 'grow' }, h('b', null, scopeLabel()), h('span', { class: 'muted small' }, ` · ${rows.length} طالبة · ${dShort(r.from)} – ${dShort(r.to)}`)),
-      h('button', { class: 'btn', onClick: () => window.print() }, svg(IC.print, 16), 'طباعة'),
-      h('button', { class: 'btn gold', onClick: exportXlsx }, svg(IC.xls, 16), 'تصدير Excel'));
+      h('button', { class: 'btn', onClick: () => R.scope === 'student' ? window.print() : printPaged() }, svg(IC.print, 16), R.scope === 'student' ? 'طباعة' : 'طباعة ' + KIND[R.kind]),
+      h('button', { class: 'btn gold', onClick: exportXlsx }, svg(IC.xls, 16), R.scope === 'student' ? 'تصدير Excel' : 'Excel ' + KIND[R.kind]));
     if (R.scope === 'student') {
       const s = rows[0]; if (!s) { put(out, h('div', { class: 'card pad muted' }, 'الطالبة غير موجودة.')); return; }
       const used = S.items.filter(i => s.counts[i.id]);
@@ -1368,6 +1428,39 @@ function renderReports(main) {
         h('tbody', null, body.length ? body : h('tr', null, h('td', { colspan: 30, class: 'muted' }, 'لا توجد طالبات.'))))),
       isP ? h('p', { class: 'tiny muted', style: { marginBottom: 0 } }, `الدرجة تُحتسب للفصل الدراسي كاملًا بحد أعلى ${sum.cap}. الرقم بين القوسين هو مجموع الدرجات المرصودة قبل تطبيق الحد.`) : null));
   };
+  // طباعة أفقية مقسّمة: كل فصل في صفحة مستقلة، والعنوان ورؤوس الأعمدة تتكرر في كل صفحة
+  function printPaged() {
+    const { sum } = data, rows = sum.rows, r = range(), t = term(), isP = R.kind === 'practice', isPts = R.kind === 'points';
+    const cols = isPts ? CATS.map(c => ({ label: c.name, get: s => s.cats[c.id] || 0 })) : itemsOf(R.kind).map((i, k) => ({ it: i, label: i.short, no: isP ? i.id : k + 1, deg: i.mode === 'manual' ? `حتى ${i.max}` : i.points ? (i.points === 2 ? 'درجتان' : i.points + ' درجات') : '', get: s => s.counts[i.id] || 0 }));
+    const PER = 16, groups = [];
+    const legend = isP ? h('div', { class: 'pp-leg' }, h('b', null, 'تفصيل الممارسات (الرقم أعلى كل خانة):'),
+      h('ol', null, cols.map(c => h('li', null, h('span', { class: 'lno' }, c.no), c.it.name + (/درج/.test(c.it.name) ? '' : ` (${c.it.grp})`))))) : null;
+    rows.forEach(s => { const g = groups[groups.length - 1]; if (!g || g.cid !== s.class_id) groups.push({ cid: s.class_id, rows: [s] }); else g.rows.push(s); });
+    const pages = [];
+    groups.forEach(g => { for (let i = 0; i < g.rows.length; i += PER) pages.push({ cid: g.cid, rows: g.rows.slice(i, i + PER), start: i, part: Math.floor(i / PER) + 1, parts: Math.ceil(g.rows.length / PER) }); });
+    if (!pages.length) return toast('لا توجد طالبات للطباعة', { bad: true });
+    const title = isP ? 'كشف درجات السلوك المتميز' : 'تقرير ' + KIND[R.kind];
+    const nameW = isP ? 20 : 30, totW = isP ? 6 : 10, itemW = ((100 - 3 - nameW - (isP ? 3 * totW : totW)) / cols.length).toFixed(3);
+    const colgroup = h('colgroup', null, h('col', { style: { width: '3%' } }), h('col', { style: { width: nameW + '%' } }), cols.map(() => h('col', { style: { width: itemW + '%' } })),
+      isP ? [h('col', { style: { width: totW + '%' } }), h('col', { style: { width: totW + '%' } }), h('col', { style: { width: totW + '%' } })] : h('col', { style: { width: totW + '%' } }));
+    const area = document.getElementById('printArea') || document.body.appendChild(h('div', { id: 'printArea', dir: 'rtl', lang: 'ar' }));
+    put(area, pages.map((pg, k) => h('section', { class: 'pp' + (isP ? ' pr' : '') },
+      h('div', { class: 'pp-h' },
+        h('div', null, h('b', { class: 'pp-t' }, title), h('div', { class: 'pp-c' }, classLabel(cls(pg.cid)) + (pg.parts > 1 ? ` (${pg.part} من ${pg.parts})` : ''))),
+        h('div', { class: 'pp-m' }, h('div', null, SCHOOL + ' · ' + APP), h('div', null, `${t.name} · من ${r.from} إلى ${r.to}`), h('div', null, `طُبع ${S.today} · ${S.user.name}`))),
+      h('table', { class: 'pt' }, colgroup.cloneNode(true),
+        h('thead', null, h('tr', null, h('th', null, 'م'), h('th', { class: 'nm' }, 'اسم الطالبة'),
+          cols.map(c => h('th', null, c.no && isP ? h('span', { class: 'pno' }, c.no) : null, c.label, c.deg && isP ? h('span', { class: 'pdeg' }, c.deg) : null)),
+          isP ? [h('th', null, 'مجموع المرات'), h('th', null, 'الدرجات المرصودة'), h('th', { class: 'fin' }, `الدرجة المحتسبة من ${sum.cap}`)] : h('th', { class: 'fin' }, isPts ? 'مجموع النقاط' : 'مجموع المرات'))),
+        h('tbody', null, pg.rows.map((s, i) => { const tot = cols.reduce((a, c) => a + c.get(s), 0); return h('tr', null, h('td', null, pg.start + i + 1), h('td', { class: 'nm' }, s.name),
+          cols.map(c => h('td', null, c.get(s) || '')), isP ? [h('td', null, tot || ''), h('td', null, s.raw || ''), h('td', { class: 'fin' }, s.pts || 0)] : h('td', { class: 'fin' }, tot)); }))),
+      isP ? h('p', { class: 'pp-n' }, `الأرقام تحت كل ممارسة = عدد المرات المرصودة للطالبة. الدرجة المحتسبة للفصل الدراسي كاملًا بحد أعلى ${sum.cap} درجة.`) : null,
+      h('div', { class: 'pp-f' }, h('span', null, isP ? 'توقيع المعلمة: ……………………' : ''), h('span', null, `صفحة ${k + 1} من ${pages.length}`)))));
+    document.body.classList.add('print-rep');
+    const done = () => { document.body.classList.remove('print-rep'); window.removeEventListener('afterprint', done); };
+    window.addEventListener('afterprint', done);
+    setTimeout(() => window.print(), 60);
+  }
   async function exportXlsx() {
     try {
       toast('جارٍ تجهيز ملف Excel…');
@@ -1386,6 +1479,11 @@ function renderReports(main) {
             return [x.date, x.student, GRADES[c.grade - 1], c.section, k ? k.name : 'درجات فقط', it.short, x.award || 0, pr ? x.points : '', pr ? (x.counts ? 'نعم' : 'لا') : '', x.note, x.by, tStamp(x.at), x.upd_by || '', tStamp(x.upd_at)]; })] },
         { name: 'معلومات', widths: [30, 60], rows: [['البند', 'القيمة'], ['المدرسة', SCHOOL], ['النطاق', scopeLabel()], ['الفصل الدراسي', t.name], ['من تاريخ', r.from], ['إلى تاريخ', r.to], ['الحد الأعلى لدرجات السلوك المتميز', cap], ['تاريخ التصدير', S.today], ['صدّرته', S.user.name],
           ['ملاحظة', 'النقاط وأعداد المرات للفترة المحددة. درجة السلوك المتميز تُحتسب للفصل الدراسي كاملًا.']] }];
+      if (R.scope !== 'student') {  // تصدير التقرير المختار فقط
+        const pick = { points: ['النقاط', 'تفاصيل الوقائع'], value: ['القيم'], practice: ['درجات السلوك المتميز'] }[R.kind];
+        const one = sheets.filter(x => pick.includes(x.name) || x.name === 'معلومات');
+        return download(xlsx(one), `${KIND[R.kind]} - ${scopeLabel().replace(/[\\/:*?"<>|]/g, '-')} ${r.from} إلى ${r.to}.xlsx`);
+      }
       download(xlsx(sheets), `نقاط ${scopeLabel().replace(/[\\/:*?"<>|]/g, '-')} ${r.from} إلى ${r.to}.xlsx`);
     } catch (e) { oops(e); }
   }
