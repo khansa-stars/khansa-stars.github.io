@@ -1392,9 +1392,11 @@ function renderReports(main) {
     const { sum, recs } = data, rows = sum.rows, r = range();
     const btns = h('div', { class: 'row noprint', style: { marginBottom: '10px' } },
       h('div', { class: 'grow' }, h('b', null, scopeLabel()), h('span', { class: 'muted small' }, ` · ${rows.length} طالبة · ${dShort(r.from)} – ${dShort(r.to)}`)),
+      h('span', { class: 'tag', title: 'رقم إصدار الموقع' }, 'إصدار ٨ نوفمبر (٥)'),
       h('button', { class: 'btn', onClick: () => { if (R.scope === 'student') { document.body.classList.remove('print-rep'); window.print(); } else printPaged(); } }, svg(IC.print, 16), R.scope === 'student' ? 'طباعة' : 'طباعة ' + KIND[R.kind]),
       h('button', { class: 'btn gold', onClick: exportXlsx }, svg(IC.xls, 16), R.scope === 'student' ? 'تصدير Excel' : 'Excel ' + KIND[R.kind]));
     if (R.scope === 'student') {
+      document.body.classList.remove('print-rep');
       const s = rows[0]; if (!s) { put(out, h('div', { class: 'card pad muted' }, 'الطالبة غير موجودة.')); return; }
       const used = S.items.filter(i => s.counts[i.id]);
       put(out, h('div', { class: 'card pad' }, head(), btns,
@@ -1413,7 +1415,9 @@ function renderReports(main) {
             h('td', { class: 'num' }, it.kind !== 'practice' ? '—' : (x.counts ? x.points : 'غير محتسبة')), h('td', null, x.by), h('td', null, x.note)); }) : h('tr', null, h('td', { colspan: 7, class: 'muted' }, 'لا توجد وقائع في هذه الفترة.')))))));
       return;
     }
+    document.body.classList.remove('print-rep');
     const isP = R.kind === 'practice', isPts = R.kind === 'points';
+    setTimeout(() => { if (S.view === 'reports' && S.rep === R && R.scope !== 'student') buildPaged(); }, 0);
     const cols = isPts ? CATS.map(c => ({ label: c.name, color: c.c, get: s => s.cats[c.id] || 0 })) : itemsOf(R.kind).map(i => ({ label: i.short, title: i.name, get: s => s.counts[i.id] || 0 }));
     let last = null, n = 0; const body = [];
     rows.forEach(s => {
@@ -1431,7 +1435,8 @@ function renderReports(main) {
       isP ? h('p', { class: 'tiny muted', style: { marginBottom: 0 } }, `الدرجة تُحتسب للفصل الدراسي كاملًا بحد أعلى ${sum.cap}. الرقم بين القوسين هو مجموع الدرجات المرصودة قبل تطبيق الحد.`) : null));
   };
   // طباعة أفقية مقسّمة: كل فصل في صفحة مستقلة، والعنوان ورؤوس الأعمدة تتكرر في كل صفحة
-  function printPaged() {
+  function printPaged() { buildPaged(); window.print(); }
+  function buildPaged() {
     const { sum } = data, rows = sum.rows, r = range(), t = term(), isP = R.kind === 'practice', isPts = R.kind === 'points';
     const cols = isPts ? CATS.map(c => ({ label: c.name, get: s => s.cats[c.id] || 0 })) : itemsOf(R.kind).map((i, k) => ({ it: i, label: i.short, no: isP ? i.id : k + 1, deg: i.mode === 'manual' ? `حتى ${i.max}` : i.points ? (i.points === 2 ? 'درجتان' : i.points + ' درجات') : '', get: s => s.counts[i.id] || 0 }));
     const PER = 16, groups = [];
@@ -1440,7 +1445,7 @@ function renderReports(main) {
     rows.forEach(s => { const g = groups[groups.length - 1]; if (!g || g.cid !== s.class_id) groups.push({ cid: s.class_id, rows: [s] }); else g.rows.push(s); });
     const pages = [];
     groups.forEach(g => { for (let i = 0; i < g.rows.length; i += PER) pages.push({ cid: g.cid, rows: g.rows.slice(i, i + PER), start: i, part: Math.floor(i / PER) + 1, parts: Math.ceil(g.rows.length / PER) }); });
-    if (!pages.length) return toast('لا توجد طالبات للطباعة', { bad: true });
+    if (!pages.length) { document.body.classList.remove('print-rep'); return; }
     const title = isP ? 'كشف درجات السلوك المتميز' : 'تقرير ' + KIND[R.kind];
     const nameW = isP ? 20 : 30, totW = isP ? 6 : 10, itemW = ((100 - 3 - nameW - (isP ? 3 * totW : totW)) / cols.length).toFixed(3);
     const colgroup = h('colgroup', null, h('col', { style: { width: '3%' } }), h('col', { style: { width: nameW + '%' } }), cols.map(() => h('col', { style: { width: itemW + '%' } })),
@@ -1457,10 +1462,9 @@ function renderReports(main) {
         h('tbody', null, pg.rows.map((s, i) => { const tot = cols.reduce((a, c) => a + c.get(s), 0); return h('tr', null, h('td', null, pg.start + i + 1), h('td', { class: 'nm' }, s.name),
           cols.map(c => h('td', null, c.get(s) || '')), isP ? [h('td', null, tot || ''), h('td', null, s.raw || ''), h('td', { class: 'fin' }, s.pts || 0)] : h('td', { class: 'fin' }, tot)); }))),
       isP ? h('p', { class: 'pp-n' }, `الأرقام تحت كل ممارسة = عدد المرات المرصودة للطالبة. الدرجة المحتسبة للفصل الدراسي كاملًا بحد أعلى ${sum.cap} درجة.`) : null,
-      h('div', { class: 'pp-f' }, h('span', null, isP ? 'توقيع المعلمة: ……………………' : ''), h('span', null, `صفحة ${k + 1} من ${pages.length}`)))));
-    // يبقى وضع الطباعة مفعّلًا (لا يؤثر على الشاشة) لأن الآيباد يلتقط الصفحة بعد إغلاق نافذة الطباعة أحيانًا
+      h('div', { class: 'pp-f' }, h('span'), h('span', null, `صفحة ${k + 1} من ${pages.length}`)))));
+    // جاهز دائمًا في صفحة التقارير: أي طباعة (من الزر أو من قائمة سفاري، عمودي أو أفقي) تطبع هذا الكشف
     document.body.classList.add('print-rep');
-    window.print();
   }
   async function exportXlsx() {
     try {
