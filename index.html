@@ -872,7 +872,7 @@ function range() {
   if (S.preset === 'today') from = to = td;
   else if (S.preset === 'week') { const d = pd(td); d.setUTCDate(d.getUTCDate() - d.getUTCDay()); from = iso(d); to = td; }
   else if (S.preset === 'month') { from = td.slice(0, 8) + '01'; to = td; }
-  else if (S.preset === 'custom') { from = S.from || t.start; to = S.to || t.end; }
+  else if (S.preset === 'custom') { from = S.from || t.start; to = S.to || t.end; if (from > to) [from, to] = [to, from]; }
   if (from < t.start) from = t.start; if (to > t.end) to = t.end;
   return { from, to };
 }
@@ -939,6 +939,8 @@ async function loadSummary(silent) {
 
 function periodBar(onChange) {
   const box = h('div', { class: 'toolbar' });
+  // إذا كُتب تاريخ البداية بعد تاريخ النهاية نبدّلهما تلقائيًا
+  const fix = () => { if (S.from && S.to && S.from > S.to) { [S.from, S.to] = [S.to, S.from]; toast('بدّلت التاريخين: «من» يجب أن يكون قبل «إلى»'); draw(); } onChange(); };
   const draw = () => {
     const t = term(), r = range();
     put(box, 
@@ -947,8 +949,8 @@ function periodBar(onChange) {
         S.terms.map(x => h('option', { value: x.id }, x.name))) : h('span', { class: 'tag ok' }, t ? t.name : '—'),
       h('div', { class: 'seg' }, PRESETS.map(([k, l]) => h('button', { class: S.preset === k ? 'on' : '', onClick: () => { S.preset = k; if (k === 'custom') { S.from = S.from || r.from; S.to = S.to || r.to; } draw(); onChange(); } }, l))),
       S.preset === 'custom' ? h('div', { class: 'row' },
-        h('input', { type: 'date', style: { width: 'auto' }, value: S.from || '', min: t && t.start, max: t && t.end, onChange: e => { S.from = e.target.value; onChange(); } }), 'إلى',
-        h('input', { type: 'date', style: { width: 'auto' }, value: S.to || '', min: t && t.start, max: t && t.end, onChange: e => { S.to = e.target.value; onChange(); } })) :
+        h('b', { class: 'small' }, 'من'), h('input', { type: 'date', style: { width: 'auto' }, value: S.from || '', min: t && t.start, max: t && t.end, onChange: e => { S.from = e.target.value; fix(); } }),
+        h('b', { class: 'small' }, 'إلى'), h('input', { type: 'date', style: { width: 'auto' }, value: S.to || '', min: t && t.start, max: t && t.end, onChange: e => { S.to = e.target.value; fix(); } })) :
         (r.from ? h('span', { class: 'muted small' }, r.from === r.to ? dLong(r.from) : `${dShort(r.from)} – ${dShort(r.to)}`) : null));
   };
   draw(); return box;
@@ -1389,10 +1391,10 @@ function renderReports(main) {
   const head = () => { const r = range(), t = term(); return h('div', { class: 'print-head' }, h('h2', null, `${SCHOOL} — تقرير ${R.scope === 'student' ? 'الطالبة' : KIND[R.kind]}`),
     h('p', null, `${scopeLabel()} · ${t.name} · من ${r.from} إلى ${r.to} · طُبع بتاريخ ${S.today} بواسطة ${S.user.name}`)); };
   const draw = () => {
-    const { sum, recs } = data, rows = sum.rows, r = range();
+    const { sum, recs } = data, rows = sum.rows, r = { from: sum.from, to: sum.to };
     const btns = h('div', { class: 'row noprint', style: { marginBottom: '10px' } },
-      h('div', { class: 'grow' }, h('b', null, scopeLabel()), h('span', { class: 'muted small' }, ` · ${rows.length} طالبة · ${dShort(r.from)} – ${dShort(r.to)}`)),
-      h('span', { class: 'tag', title: 'رقم إصدار الموقع' }, 'إصدار ٨ نوفمبر (٥)'),
+      h('div', { class: 'grow' }, h('b', null, scopeLabel()), h('span', { class: 'muted small' }, ` · ${rows.length} طالبة · ${dShort(r.from)} – ${dShort(r.to)}`), R.kind === 'practice' && R.scope !== 'student' ? h('span', { class: 'tag gold', style: { marginInlineStart: '8px' } }, 'أعداد المرات للفترة المحددة · الدرجة المحتسبة للفصل الدراسي كاملًا') : null),
+      h('span', { class: 'tag', title: 'رقم إصدار الموقع' }, 'إصدار ٨ نوفمبر (٧)'),
       h('button', { class: 'btn', onClick: () => { if (R.scope === 'student') { document.body.classList.remove('print-rep'); window.print(); } else printPaged(); } }, svg(IC.print, 16), R.scope === 'student' ? 'طباعة' : 'طباعة ' + KIND[R.kind]),
       h('button', { class: 'btn gold', onClick: exportXlsx }, svg(IC.xls, 16), R.scope === 'student' ? 'تصدير Excel' : 'Excel ' + KIND[R.kind]));
     if (R.scope === 'student') {
@@ -1437,7 +1439,7 @@ function renderReports(main) {
   // طباعة أفقية مقسّمة: كل فصل في صفحة مستقلة، والعنوان ورؤوس الأعمدة تتكرر في كل صفحة
   function printPaged() { buildPaged(); window.print(); }
   function buildPaged() {
-    const { sum } = data, rows = sum.rows, r = range(), t = term(), isP = R.kind === 'practice', isPts = R.kind === 'points';
+    const { sum } = data, rows = sum.rows, r = { from: sum.from, to: sum.to }, t = term(), isP = R.kind === 'practice', isPts = R.kind === 'points';
     const cols = isPts ? CATS.map(c => ({ label: c.name, get: s => s.cats[c.id] || 0 })) : itemsOf(R.kind).map((i, k) => ({ it: i, label: i.short, no: isP ? i.id : k + 1, deg: i.mode === 'manual' ? `حتى ${i.max}` : i.points ? (i.points === 2 ? 'درجتان' : i.points + ' درجات') : '', get: s => s.counts[i.id] || 0 }));
     const PER = 16, groups = [];
     const legend = isP ? h('div', { class: 'pp-leg' }, h('b', null, 'تفصيل الممارسات (الرقم أعلى كل خانة):'),
