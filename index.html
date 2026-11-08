@@ -456,7 +456,7 @@ th.behcol,td.behcol{text-align:center;padding-inline:10px;white-space:nowrap}
   body.print-rep{background:#fff!important}
   #printArea{font-family:var(--font);color:#000;direction:rtl;text-align:right}
   .pp-m{direction:rtl}
-  .pp{break-after:page;page-break-after:always;height:186mm;width:100%;display:flex;flex-direction:column;overflow:hidden}
+  .pp{break-after:page;page-break-after:always;width:100%;display:block}
   .pp:last-child{break-after:auto;page-break-after:auto}
   .pp-h{display:flex;justify-content:space-between;align-items:flex-end;gap:10mm;border-bottom:.6mm solid #000;padding-bottom:2mm;margin-bottom:2.5mm}
   .pp-t{font-size:17pt;display:block;line-height:1.2} .pp-c{font-size:14pt;font-weight:700;line-height:1.3}
@@ -481,7 +481,7 @@ th.behcol,td.behcol{text-align:center;padding-inline:10px;white-space:nowrap}
   .pp-leg ol{list-style:none;margin:1mm 0 0;padding:0;columns:3;column-gap:5mm}
   .pp-leg li{break-inside:avoid;margin-bottom:.8mm;display:flex;gap:1.5mm}
   .lno{font-weight:700;flex:none;min-width:7mm}
-  .pp-f{margin-top:auto;display:flex;justify-content:space-between;font-size:10pt;padding-top:1.5mm;flex:none}
+  .pp-f{margin-top:5mm;display:flex;justify-content:space-between;font-size:10pt}
   tr{break-inside:avoid;page-break-inside:avoid}
 }
 
@@ -896,6 +896,7 @@ const pageHead = (ic, title, sub, tone) => h('div', { class: 'pagehead', style: 
 // عنوان قسم داخل الصفحة
 const blockLabel = (text, ic) => h('div', { class: 'blocklabel' }, ic ? lic(ic, 24) : null, h('span', null, text));
 function render() {
+  document.body.classList.remove('print-rep');
   S.refreshers.clear(); S.gridRefresh = null;
   if (S.view === 'display') return renderDisplay();
   const nav = [['record', 'الرصد', 'sheet'], ['reports', 'التقارير', 'chart'], ['display', 'شاشة العرض', 'screen']];
@@ -1369,6 +1370,7 @@ function openStudent(st) {
 
 /* ═════════════════════════ التقارير ═════════════════════════ */
 function renderReports(main) {
+  document.body.classList.remove('print-rep');
   const R = S.rep = Object.assign({ scope: 'class', classId: S.classId, grade: (cls(S.classId) || {}).grade || 1, student: null, kind: 'points' }, S.rep || {});
   const out = h('div'), ctl = h('div', { class: 'card pad noprint', style: { display: 'grid', gap: '12px', marginBottom: '14px' } });
   let data = null;
@@ -1390,7 +1392,7 @@ function renderReports(main) {
     const { sum, recs } = data, rows = sum.rows, r = range();
     const btns = h('div', { class: 'row noprint', style: { marginBottom: '10px' } },
       h('div', { class: 'grow' }, h('b', null, scopeLabel()), h('span', { class: 'muted small' }, ` · ${rows.length} طالبة · ${dShort(r.from)} – ${dShort(r.to)}`)),
-      h('button', { class: 'btn', onClick: () => R.scope === 'student' ? window.print() : printPaged() }, svg(IC.print, 16), R.scope === 'student' ? 'طباعة' : 'طباعة ' + KIND[R.kind]),
+      h('button', { class: 'btn', onClick: () => { if (R.scope === 'student') { document.body.classList.remove('print-rep'); window.print(); } else printPaged(); } }, svg(IC.print, 16), R.scope === 'student' ? 'طباعة' : 'طباعة ' + KIND[R.kind]),
       h('button', { class: 'btn gold', onClick: exportXlsx }, svg(IC.xls, 16), R.scope === 'student' ? 'تصدير Excel' : 'Excel ' + KIND[R.kind]));
     if (R.scope === 'student') {
       const s = rows[0]; if (!s) { put(out, h('div', { class: 'card pad muted' }, 'الطالبة غير موجودة.')); return; }
@@ -1456,10 +1458,9 @@ function renderReports(main) {
           cols.map(c => h('td', null, c.get(s) || '')), isP ? [h('td', null, tot || ''), h('td', null, s.raw || ''), h('td', { class: 'fin' }, s.pts || 0)] : h('td', { class: 'fin' }, tot)); }))),
       isP ? h('p', { class: 'pp-n' }, `الأرقام تحت كل ممارسة = عدد المرات المرصودة للطالبة. الدرجة المحتسبة للفصل الدراسي كاملًا بحد أعلى ${sum.cap} درجة.`) : null,
       h('div', { class: 'pp-f' }, h('span', null, isP ? 'توقيع المعلمة: ……………………' : ''), h('span', null, `صفحة ${k + 1} من ${pages.length}`)))));
+    // يبقى وضع الطباعة مفعّلًا (لا يؤثر على الشاشة) لأن الآيباد يلتقط الصفحة بعد إغلاق نافذة الطباعة أحيانًا
     document.body.classList.add('print-rep');
-    const done = () => { document.body.classList.remove('print-rep'); window.removeEventListener('afterprint', done); };
-    window.addEventListener('afterprint', done);
-    setTimeout(() => window.print(), 60);
+    window.print();
   }
   async function exportXlsx() {
     try {
