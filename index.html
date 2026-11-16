@@ -858,7 +858,9 @@ const isDisc = () => isAdmin() || !!(S.user && S.user.discipline);
 const isAct = () => isAdmin() || !!(S.user && S.user.activity);
 // الإدارية: السلوك الإيجابي (القيم) فقط، مع ما تُكلَّف به من انضباط أو نشاط
 const isStaff = () => !!(S.user && S.user.role === 'teacher' && S.user.staff);
-const canItem = it => isStaff() ? (it.cat === 'values' || (it.cat === 'discipline' && isDisc()) || (it.cat === 'activity' && isAct())) : it.cat === 'activity' ? isAct() : (!it.counselor_only || isAdmin() || (isDisc() && it.kind === 'point' && it.cat === 'discipline'));
+// انضباط فقط: لا تمنح إلا نقاط الانضباط
+const isDiscOnly = () => !!(S.user && S.user.role === 'teacher' && S.user.disc_only);
+const canItem = it => isDiscOnly() ? (it.cat === 'discipline' && it.kind === 'point') : isStaff() ? (it.cat === 'values' || (it.cat === 'discipline' && isDisc()) || (it.cat === 'activity' && isAct())) : it.cat === 'activity' ? isAct() : (!it.counselor_only || isAdmin() || (isDisc() && it.kind === 'point' && it.cat === 'discipline'));
 const canRecord = () => S.user.role !== 'display';
 const term = () => S.terms.find(t => t.id === S.termId);
 const cls = id => S.classes.find(c => c.id === id);
@@ -907,7 +909,7 @@ function render() {
       h('div', { class: 'logo' }, lic('star', 44)),
       h('div', null, h('h1', { class: 'appname' }, APP), h('div', { class: 'sub' }, SCHOOL)),
       h('nav', { class: 'nav' }, nav.map(([v, l, ic]) => h('button', { class: S.view === v ? 'on' : '', 'data-v': v, 'aria-current': S.view === v ? 'page' : null, onClick: () => { S.view = v; render(); } }, h('span', { class: 'nv-ic' }, lic(ic, 24)), l))),
-      h('div', { class: 'user' }, h('div', { class: 'who' }, h('b', null, S.user.name), h('span', null, (isStaff() ? 'إدارية' : ROLES[S.user.role]) + (S.user.role === 'teacher' ? (S.user.discipline ? ' · مسؤولة الانضباط' : '') + (S.user.activity ? ' · مسؤولة النشاط' : '') : ''))),
+      h('div', { class: 'user' }, h('div', { class: 'who' }, h('b', null, S.user.name), h('span', null, isDiscOnly() ? 'مسؤولة الانضباط (انضباط فقط)' : (isStaff() ? 'إدارية' : ROLES[S.user.role]) + (S.user.role === 'teacher' ? (S.user.discipline ? ' · مسؤولة الانضباط' : '') + (S.user.activity ? ' · مسؤولة النشاط' : '') : ''))),
         isAdmin() ? h('button', { class: 'btn ghost', title: 'تغيير كلمة مرور الموجهة الطلابية', onClick: dlgPassword }, svg(IC.key)) : null,
         h('button', { class: 'btn ghost', title: 'تسجيل الخروج', onClick: logout }, svg(IC.out))))),
     main));
@@ -993,6 +995,7 @@ function setBudget(b) {
   const box = document.getElementById('budgetBox'); if (box) put(box, budgetNode());
 }
 function budgetNode() {
+  if (isDiscOnly()) return null;
   const b = S.budget; if (!b || !canRecord()) return null;
   if (b.unlimited) return h('div', { class: 'budget' }, h('b', null, 'رصيد الموجهة الطلابية'), h('div', { class: 'small muted' }, `غير محدود — ${ptsWord(b.award)} لكل منحة`));
   const left = Math.max(0, b.limit - b.used);
@@ -1018,13 +1021,13 @@ function renderRecord(main) {
   const reload = async () => { put(content, h('div', { class: 'loading' }, h('span', { class: 'spin' }), ' جارٍ تحميل الكشف…')); S.sum = null; await loadSummary(); };
   const drawTabs = () => {
     const b = S.budget || { award: 2, limit: 20 };
-    if (isStaff()) { S.sec = 'points'; if (!S.staffInit) { S.staffInit = true; if (S.cat === 'all' || S.cat === 'academic') S.cat = 'values'; } }
-    put(tabsBox, isStaff() ? null : [
+    if (isStaff() || isDiscOnly()) { S.sec = 'points'; if (isDiscOnly()) S.cat = 'discipline'; else if (!S.staffInit) { S.staffInit = true; if (S.cat === 'all' || S.cat === 'academic') S.cat = 'values'; } }
+    put(tabsBox, isStaff() || isDiscOnly() ? null : [
       h('button', { class: 'tab' + (!isGrades() ? ' on' : ''), onClick: () => { S.sec = 'points'; drawTabs(); S.paint(); } }, h('span', { class: 'ic' }, lic('star', 42)), h('span', null, h('b', null, 'النقاط'), h('span', null, `${ptsWord(b.award)} لكل منحة — رصيد المعلمة ${b.limit} نقطة في الأسبوع`))),
       h('button', { class: 'tab gold' + (isGrades() ? ' on' : ''), onClick: () => { S.sec = 'grades'; drawTabs(); S.paint(); } }, h('span', { class: 'ic' }, lic('shield', 42)), h('span', null, h('b', null, 'درجات السلوك المتميز'), h('span', null, `الدرجات الرسمية — بحد أعلى ${S.cap} درجة في الفصل الدراسي`)))]);
     put(catBox, isGrades() ? [h('p', { class: 'note small', style: { margin: 0 } }, 'السلوك المتميز يُرصد هنا بالدرجات الرسمية فقط (بحد أعلى ' + S.cap + ' في الفصل الدراسي)، ولا يمنح نقاطًا ولا يُحسب من رصيد المعلمة.')] :
       h('div', { class: 'catbar' },
-        [{ id: 'all', name: 'الكل', c: '#0f9a82', t: '#fff' }, ...CATS.filter(c => !isStaff() || c.id === 'values' || c.id === 'activity' || (c.id === 'discipline' && isDisc()))].map(c => h('button', { class: 'catchip' + (S.cat === c.id ? ' on' : ''), title: c.hint || '', style: S.cat === c.id ? { background: c.c, color: c.t } : null,
+        (isDiscOnly() ? CATS.filter(c => c.id === 'discipline') : [{ id: 'all', name: 'الكل', c: '#0f9a82', t: '#fff' }, ...CATS.filter(c => !isStaff() || c.id === 'values' || c.id === 'activity' || (c.id === 'discipline' && isDisc()))]).map(c => h('button', { class: 'catchip' + (S.cat === c.id ? ' on' : ''), title: c.hint || '', style: S.cat === c.id ? { background: c.c, color: c.t } : null,
           onClick: () => { S.cat = c.id; drawTabs(); S.paint(); } }, lic(c.ic || 'spark', 30), c.name)),
         h('div', { id: 'budgetBox', style: { marginInlineStart: 'auto' } }, budgetNode())));
   };
@@ -1394,7 +1397,7 @@ function renderReports(main) {
     const { sum, recs } = data, rows = sum.rows, r = { from: sum.from, to: sum.to };
     const btns = h('div', { class: 'row noprint', style: { marginBottom: '10px' } },
       h('div', { class: 'grow' }, h('b', null, scopeLabel()), h('span', { class: 'muted small' }, ` · ${rows.length} طالبة · ${dShort(r.from)} – ${dShort(r.to)}`), R.kind === 'practice' && R.scope !== 'student' ? h('span', { class: 'tag gold', style: { marginInlineStart: '8px' } }, 'أعداد المرات للفترة المحددة · الدرجة المحتسبة للفصل الدراسي كاملًا') : null),
-      h('span', { class: 'tag', title: 'رقم إصدار الموقع' }, 'إصدار ٨ نوفمبر (٧)'),
+      h('span', { class: 'tag', title: 'رقم إصدار الموقع' }, 'إصدار ١٦ نوفمبر'),
       h('button', { class: 'btn', onClick: () => { if (R.scope === 'student') { document.body.classList.remove('print-rep'); window.print(); } else printPaged(); } }, svg(IC.print, 16), R.scope === 'student' ? 'طباعة' : 'طباعة ' + KIND[R.kind]),
       h('button', { class: 'btn gold', onClick: exportXlsx }, svg(IC.xls, 16), R.scope === 'student' ? 'تصدير Excel' : 'Excel ' + KIND[R.kind]));
     if (R.scope === 'student') {
@@ -1607,7 +1610,7 @@ async function admUsers(body) {
       h('button', { class: 'btn', onClick: () => dlgUsersBulk(again) }, svg(IC.list, 15), 'إضافة مجموعة'),
       h('button', { class: 'btn primary', onClick: () => dlgUser(null, again) }, svg(IC.plus, 15), 'إضافة معلمة / إدارية')),
     h('div', { class: 'scroll' }, h('table', { class: 't' }, h('thead', null, h('tr', null, ['الاسم', 'الصفة', 'رقم الدخول', 'الحالة', 'عدد ما منحته', ''].map(x => h('th', null, x)))),
-      h('tbody', null, us.map(u => h('tr', null, h('td', { style: { fontWeight: 600 } }, u.name), h('td', null, h('span', { class: 'tag' + (u.role === 'counselor' ? ' gold' : '') }, u.role === 'teacher' && u.staff ? 'إدارية' : ROLES[u.role]), u.discipline ? h('span', { class: 'tag ok', style: { marginInlineStart: '6px' } }, 'مسؤولة الانضباط') : null, u.activity ? h('span', { class: 'tag', style: { marginInlineStart: '6px', background: '#fdeada', color: '#9a4a10' } }, 'مسؤولة النشاط') : null),
+      h('tbody', null, us.map(u => h('tr', null, h('td', { style: { fontWeight: 600 } }, u.name), h('td', null, h('span', { class: 'tag' + (u.role === 'counselor' ? ' gold' : '') }, u.role === 'teacher' && u.disc_only ? 'انضباط فقط' : u.role === 'teacher' && u.staff ? 'إدارية' : ROLES[u.role]), u.discipline ? h('span', { class: 'tag ok', style: { marginInlineStart: '6px' } }, 'مسؤولة الانضباط') : null, u.activity ? h('span', { class: 'tag', style: { marginInlineStart: '6px', background: '#fdeada', color: '#9a4a10' } }, 'مسؤولة النشاط') : null),
         h('td', null, u.role !== 'teacher' ? h('span', { class: 'muted small' }, 'كلمة مرور') : h('span', { class: 'tag ' + (u.has_pin ? 'ok' : 'off') }, u.has_pin ? 'معيّن' : 'غير معيّن — لا تستطيع الدخول')),
         h('td', null, h('span', { class: 'tag ' + (u.active ? 'ok' : 'off') }, u.active ? 'فعّال' : 'موقوف')), h('td', { class: 'num' }, u.records),
         h('td', { style: { textAlign: 'end' } }, u.role === 'display' ? null : h('button', { class: 'btn sm', onClick: () => dlgUser(u, again) }, svg(IC.edit, 14), 'تعديل'))))))));
@@ -1656,18 +1659,22 @@ function dlgUser(u, done) {
     a = h('input', { type: 'checkbox', style: { width: '20px', height: '20px' } }); a.checked = u ? u.active : true;
   const dsc = h('input', { type: 'checkbox', style: { width: '20px', height: '20px' } }); dsc.checked = !!(u && u.discipline);
   const actb = h('input', { type: 'checkbox', style: { width: '20px', height: '20px' } }); actb.checked = !!(u && u.activity);
-  let staff = !!(u && u.staff);
-  const kindBox = h('div'); const drawKind = () => put(kindBox, h('div', { class: 'field' }, h('span', null, 'الصفة'), h('div', { class: 'seg', style: { display: 'flex' } },
-    [[false, 'معلمة'], [true, 'إدارية']].map(([v, l]) => h('button', { type: 'button', class: staff === v ? 'on' : '', style: { flex: '1' }, onClick: () => { staff = v; drawKind(); } }, l))),
-    h('small', { class: 'muted' }, staff ? 'الإدارية تمنح نقاط السلوك الإيجابي (القيم) فقط من رصيدها الأسبوعي، إضافة إلى الانضباط أو النشاط إن كُلّفت بهما.' : 'المعلمة تمنح نقاط التحصيل الدراسي والسلوك الإيجابي (القيم) وترصد درجات السلوك المتميز.')));
+  let kind = u && u.disc_only ? 'disc' : u && u.staff ? 'staff' : 'teacher';
+  const extras = h('div', { style: { display: 'grid', gap: '10px' } });
+  const KINDS = [['teacher', 'معلمة', 'المعلمة تمنح نقاط التحصيل الدراسي والسلوك الإيجابي (القيم) وترصد درجات السلوك المتميز.'],
+    ['staff', 'إدارية', 'الإدارية تمنح نقاط السلوك الإيجابي (القيم) فقط من رصيدها الأسبوعي، إضافة إلى الانضباط أو النشاط إن كُلّفت بهما.'],
+    ['disc', 'انضباط فقط', 'لا تمنح إلا نقاط الانضباط (لكل طالبة أو للفصل كاملًا)، بلا حد ودون رصيد. لا ترى أقسام النقاط الأخرى ولا الدرجات.']];
+  const kindBox = h('div'); const drawKind = () => { put(kindBox, h('div', { class: 'field' }, h('span', null, 'الصفة'), h('div', { class: 'seg', style: { display: 'flex' } },
+    KINDS.map(([v, l]) => h('button', { type: 'button', class: kind === v ? 'on' : '', style: { flex: '1' }, onClick: () => { kind = v; drawKind(); } }, l))),
+    h('small', { class: 'muted' }, KINDS.find(k => k[0] === kind)[2]))); extras.style.display = kind === 'disc' ? 'none' : 'grid'; };
   drawKind();
   const dl = dialog({ title: u ? 'تعديل البيانات' : 'إضافة معلمة أو إدارية', body: [eb, h('label', { class: 'field' }, h('span', null, 'الاسم كما يظهر في السجلات'), n),
       T ? h('label', { class: 'field' }, h('span', null, 'آخر أربعة أرقام من الهوية (رقم الدخول)'), pin) : null,
       T ? kindBox : null,
-      T ? h('label', { style: { display: 'flex', flexWrap: 'nowrap', gap: '10px', alignItems: 'flex-start', fontWeight: 600, cursor: 'pointer', background: '#f3f8ff', border: '1px solid #d9e7fb', borderRadius: '12px', padding: '10px 12px' } }, dsc, h('span', { style: { flex: '1' } }, 'مسؤولة الانضباط', h('small', { class: 'muted', style: { display: 'block', fontWeight: 400 } }, 'تمنح نقاط الانضباط الأسبوعية للطالبات (فردي أو للفصل كاملًا)، دون أن تُخصم من رصيدها'))) : null,
-      T ? h('label', { style: { display: 'flex', flexWrap: 'nowrap', gap: '10px', alignItems: 'flex-start', fontWeight: 600, cursor: 'pointer', background: '#fff6ee', border: '1px solid #fbdcc2', borderRadius: '12px', padding: '10px 12px' } }, actb, h('span', { style: { flex: '1' } }, 'مسؤولة النشاط', h('small', { class: 'muted', style: { display: 'block', fontWeight: 400 } }, 'تضيف مناسبات الأنشطة وتمنح المشاركات نقاطها، دون أن تُخصم من رصيدها'))) : null,
+      T ? put(extras, h('label', { style: { display: 'flex', flexWrap: 'nowrap', gap: '10px', alignItems: 'flex-start', fontWeight: 600, cursor: 'pointer', background: '#f3f8ff', border: '1px solid #d9e7fb', borderRadius: '12px', padding: '10px 12px' } }, dsc, h('span', { style: { flex: '1' } }, 'مسؤولة الانضباط', h('small', { class: 'muted', style: { display: 'block', fontWeight: 400 } }, 'تمنح نقاط الانضباط الأسبوعية للطالبات (فردي أو للفصل كاملًا)، دون أن تُخصم من رصيدها'))),
+      h('label', { style: { display: 'flex', flexWrap: 'nowrap', gap: '10px', alignItems: 'flex-start', fontWeight: 600, cursor: 'pointer', background: '#fff6ee', border: '1px solid #fbdcc2', borderRadius: '12px', padding: '10px 12px' } }, actb, h('span', { style: { flex: '1' } }, 'مسؤولة النشاط', h('small', { class: 'muted', style: { display: 'block', fontWeight: 400 } }, 'تضيف مناسبات الأنشطة وتمنح المشاركات نقاطها، دون أن تُخصم من رصيدها')))) : null,
       u && T ? h('label', { class: 'row', style: { fontWeight: 600 } }, a, 'الحساب فعّال (إلغاء التفعيل يمنع الدخول)') : null],
-    footer: [h('button', { class: 'btn primary', onClick: async () => { try { await rpc('kh_user_save', { p_id: u ? u.id : null, p_name: n.value, p_pin: T ? (pin.value || null) : null, p_active: a.checked, p_discipline: T ? dsc.checked : null, p_activity: T ? actb.checked : null, p_staff: T ? staff : null }); if (u && u.id === S.user.id) S.user.name = n.value.trim(); dl.close(); done(); toast('تم الحفظ'); } catch (e) { formErr(eb, e.message); } } }, 'حفظ')] });
+    footer: [h('button', { class: 'btn primary', onClick: async () => { try { await rpc('kh_user_save', { p_id: u ? u.id : null, p_name: n.value, p_pin: T ? (pin.value || null) : null, p_active: a.checked, p_discipline: T ? (kind === 'disc' || dsc.checked) : null, p_activity: T ? (kind !== 'disc' && actb.checked) : null, p_staff: T ? kind !== 'teacher' : null, p_disc_only: T ? kind === 'disc' : null }); if (u && u.id === S.user.id) S.user.name = n.value.trim(); dl.close(); done(); toast('تم الحفظ'); } catch (e) { formErr(eb, e.message); } } }, 'حفظ')] });
 }
 const SURVEY_TEMPLATE = { title: 'استبانة رضا أولياء الأمور عن خدمات المدرسة', intro: 'رأيكم يهمنا لتطوير خدماتنا. نشكر لكم وقتكم ومشاركتكم.', questions: [
   { type: 'rating', text: 'تواصل المدرسة مع الأسرة' }, { type: 'rating', text: 'تعامل المعلمات مع الطالبات' }, { type: 'rating', text: 'البيئة المدرسية والنظافة' },
