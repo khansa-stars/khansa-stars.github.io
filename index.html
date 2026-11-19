@@ -1410,8 +1410,9 @@ function renderReports(main) {
   const recOnly = () => R.kind === 'practice' && R.scope !== 'student' && R.onlyRec !== false;
   const pRows = rows => recOnly() ? rows.filter(s => itemsOf('practice').some(i => (s.counts[i.id] || 0) > 0)) : rows;
   async function copyNames(rows) {
-    const byC = []; rows.forEach(s => { const g = byC[byC.length - 1]; if (!g || g.cid !== s.class_id) byC.push({ cid: s.class_id, n: [s.name] }); else g.n.push(s.name); });
-    const txt = byC.length === 1 ? byC[0].n.join('\n') : byC.map(g => classLabel(cls(g.cid)) + '\n' + g.n.join('\n')).join('\n\n');
+    // سطر لكل طالبة: «الاسم - الصف» (مثل: ريم أحمد سعيد - الرابع أ) بلا عناوين ولا أسطر فارغة
+    const L = 'أبجدهوزحطي';
+    const txt = rows.map(s => { const c = cls(s.class_id); return s.name.trim().replace(/\s+/g, ' ') + (c ? ' - ' + GRADES[c.grade - 1] + ' ' + (L[c.section - 1] || c.section) : ''); }).join('\n');
     try { await navigator.clipboard.writeText(txt); }
     catch (e) { const t = h('textarea', { style: { position: 'fixed', opacity: '0' } }); t.value = txt; document.body.append(t); t.select(); document.execCommand('copy'); t.remove(); }
     toast(`نُسخت ${rows.length} ${rows.length > 10 || rows.length < 3 ? 'اسمًا' : 'أسماء'} — الصقيها في المنصة`);
@@ -1436,7 +1437,7 @@ function renderReports(main) {
     const { sum, recs } = data, rows = R.scope === 'student' ? sum.rows : pRows(sum.rows), r = { from: sum.from, to: sum.to };
     const btns = h('div', { class: 'row noprint', style: { marginBottom: '10px' } },
       h('div', { class: 'grow' }, h('b', null, scopeLabel()), h('span', { class: 'muted small' }, ` · ${rows.length} طالبة · من ${dHs(r.from)} إلى ${dHs(r.to)}`), R.kind === 'practice' && R.scope !== 'student' ? h('span', { class: 'tag gold', style: { marginInlineStart: '8px' } }, 'أعداد المرات للفترة المحددة · الدرجة المحتسبة للفصل الدراسي كاملًا') : null),
-      h('span', { class: 'tag', title: 'رقم إصدار الموقع' }, 'إصدار ١٩ نوفمبر (٣)'),
+      h('span', { class: 'tag', title: 'رقم إصدار الموقع' }, 'إصدار ١٩ نوفمبر (٦)'),
       R.kind === 'practice' && R.scope !== 'student' ? h('label', { class: 'chip' + (recOnly() ? ' on' : ''), style: { cursor: 'pointer' } },
         h('input', { type: 'checkbox', checked: recOnly(), style: { width: '18px', height: '18px' }, onChange: e => { R.onlyRec = e.target.checked; draw(); } }), 'من رُصد لها فقط') : null,
       R.kind === 'practice' && R.scope !== 'student' ? h('button', { class: 'btn', disabled: !rows.length, onClick: () => copyNames(rows) }, svg(IC.list, 16), 'نسخ الأسماء') : null,
