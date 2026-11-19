@@ -1405,7 +1405,17 @@ function openStudent(st) {
 /* ═════════════════════════ التقارير ═════════════════════════ */
 function renderReports(main) {
   document.body.classList.remove('print-rep');
-  const R = S.rep = Object.assign({ scope: 'class', classId: S.classId, grade: (cls(S.classId) || {}).grade || 1, student: null, kind: 'points' }, S.rep || {});
+  const R = S.rep = Object.assign({ scope: 'class', classId: S.classId, grade: (cls(S.classId) || {}).grade || 1, student: null, kind: 'points', onlyRec: true }, S.rep || {});
+  // السلوك المتميز: إظهار من رُصد لها شيء في الفترة فقط (مفعّل افتراضيًا)
+  const recOnly = () => R.kind === 'practice' && R.scope !== 'student' && R.onlyRec !== false;
+  const pRows = rows => recOnly() ? rows.filter(s => itemsOf('practice').some(i => (s.counts[i.id] || 0) > 0)) : rows;
+  async function copyNames(rows) {
+    const byC = []; rows.forEach(s => { const g = byC[byC.length - 1]; if (!g || g.cid !== s.class_id) byC.push({ cid: s.class_id, n: [s.name] }); else g.n.push(s.name); });
+    const txt = byC.length === 1 ? byC[0].n.join('\n') : byC.map(g => classLabel(cls(g.cid)) + '\n' + g.n.join('\n')).join('\n\n');
+    try { await navigator.clipboard.writeText(txt); }
+    catch (e) { const t = h('textarea', { style: { position: 'fixed', opacity: '0' } }); t.value = txt; document.body.append(t); t.select(); document.execCommand('copy'); t.remove(); }
+    toast(`نُسخت ${rows.length} ${rows.length > 10 || rows.length < 3 ? 'اسمًا' : 'أسماء'} — الصقيها في المنصة`);
+  }
   const out = h('div'), ctl = h('div', { class: 'card pad noprint', style: { display: 'grid', gap: '12px', marginBottom: '14px' } });
   let data = null;
   const scopeLabel = () => R.scope === 'school' ? 'جميع الصفوف' : R.scope === 'grade' ? 'الصف ' + GRADES[R.grade - 1] : R.scope === 'class' ? classLabel(cls(R.classId)) : ((S.students.find(s => s.id === R.student) || {}).name || '');
@@ -1423,10 +1433,13 @@ function renderReports(main) {
   const head = () => { const r = range(), t = term(); return h('div', { class: 'print-head' }, h('h2', null, `${SCHOOL} — تقرير ${R.scope === 'student' ? 'الطالبة' : KIND[R.kind]}`),
     h('p', null, `${scopeLabel()} · ${t.name} · من ${dHs(r.from)} إلى ${dHs(r.to)} · طُبع بتاريخ ${dHs(S.today)} بواسطة ${S.user.name}`)); };
   const draw = () => {
-    const { sum, recs } = data, rows = sum.rows, r = { from: sum.from, to: sum.to };
+    const { sum, recs } = data, rows = R.scope === 'student' ? sum.rows : pRows(sum.rows), r = { from: sum.from, to: sum.to };
     const btns = h('div', { class: 'row noprint', style: { marginBottom: '10px' } },
       h('div', { class: 'grow' }, h('b', null, scopeLabel()), h('span', { class: 'muted small' }, ` · ${rows.length} طالبة · من ${dHs(r.from)} إلى ${dHs(r.to)}`), R.kind === 'practice' && R.scope !== 'student' ? h('span', { class: 'tag gold', style: { marginInlineStart: '8px' } }, 'أعداد المرات للفترة المحددة · الدرجة المحتسبة للفصل الدراسي كاملًا') : null),
-      h('span', { class: 'tag', title: 'رقم إصدار الموقع' }, 'إصدار ١٩ نوفمبر (٢)'),
+      h('span', { class: 'tag', title: 'رقم إصدار الموقع' }, 'إصدار ١٩ نوفمبر (٣)'),
+      R.kind === 'practice' && R.scope !== 'student' ? h('label', { class: 'chip' + (recOnly() ? ' on' : ''), style: { cursor: 'pointer' } },
+        h('input', { type: 'checkbox', checked: recOnly(), style: { width: '18px', height: '18px' }, onChange: e => { R.onlyRec = e.target.checked; draw(); } }), 'من رُصد لها فقط') : null,
+      R.kind === 'practice' && R.scope !== 'student' ? h('button', { class: 'btn', disabled: !rows.length, onClick: () => copyNames(rows) }, svg(IC.list, 16), 'نسخ الأسماء') : null,
       h('button', { class: 'btn', onClick: () => { if (R.scope === 'student') { document.body.classList.remove('print-rep'); window.print(); } else printPaged(); } }, svg(IC.print, 16), R.scope === 'student' ? 'طباعة' : 'طباعة ' + KIND[R.kind]),
       h('button', { class: 'btn gold', onClick: exportXlsx }, svg(IC.xls, 16), R.scope === 'student' ? 'تصدير Excel' : 'Excel ' + KIND[R.kind]));
     if (R.scope === 'student') {
@@ -1471,7 +1484,7 @@ function renderReports(main) {
   // طباعة أفقية مقسّمة: كل فصل في صفحة مستقلة، والعنوان ورؤوس الأعمدة تتكرر في كل صفحة
   function printPaged() { buildPaged(); window.print(); }
   function buildPaged() {
-    const { sum } = data, rows = sum.rows, r = { from: sum.from, to: sum.to }, t = term(), isP = R.kind === 'practice', isPts = R.kind === 'points';
+    const { sum } = data, rows = pRows(sum.rows), r = { from: sum.from, to: sum.to }, t = term(), isP = R.kind === 'practice', isPts = R.kind === 'points';
     const cols = isPts ? CATS.map(c => ({ label: c.name, get: s => s.cats[c.id] || 0 })) : itemsOf(R.kind).map((i, k) => ({ it: i, label: i.short, no: isP ? i.id : k + 1, deg: i.mode === 'manual' ? `حتى ${i.max}` : i.points ? (i.points === 2 ? 'درجتان' : i.points + ' درجات') : '', get: s => s.counts[i.id] || 0 }));
     const PER = 16, groups = [];
     const legend = isP ? h('div', { class: 'pp-leg' }, h('b', null, 'تفصيل الممارسات (الرقم أعلى كل خانة):'),
@@ -1503,7 +1516,7 @@ function renderReports(main) {
   async function exportXlsx() {
     try {
       toast('جارٍ تجهيز ملف Excel…');
-      const a = data.a, recs = data.recs || await rpc('kh_records', a), rows = data.sum.rows, cap = data.sum.cap, r = range(), t = term();
+      const a = data.a, recs = data.recs || await rpc('kh_records', a), rows = R.scope === 'student' ? data.sum.rows : pRows(data.sum.rows), cap = data.sum.cap, r = range(), t = term();
       const base = s => { const c = cls(s.class_id); return [s.name, GRADES[c.grade - 1], c.section]; };
       const V = itemsOf('value'), P = itemsOf('practice');
       const sheets = [
