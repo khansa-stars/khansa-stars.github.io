@@ -598,6 +598,10 @@ const fT = new Intl.DateTimeFormat('ar-u-ca-gregory-nu-latn', { day: 'numeric', 
 const dLong = s => s ? fG.format(pd(s)) : '';
 const dHijri = s => (s && fH) ? fH.format(pd(s)).replace(/\s*هـ?$/, '') + ' هـ' : '';
 const dShort = s => s ? fGs.format(pd(s)) : '';
+// التاريخ الهجري (أم القرى) بالأرقام: 1448/05/28 — يُستخدم في التقارير والطباعة وExcel
+let fHn; try { fHn = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura-nu-latn', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }); } catch (e) { fHn = null; }
+const dH = (s, sep = '/') => { if (!s) return ''; if (!fHn) return s; const o = {}; fHn.formatToParts(pd(s)).forEach(x => { o[x.type] = x.value; }); return [o.year.replace(/\D/g, ''), o.month, o.day].join(sep); };
+const dHs = s => s ? dH(s) + ' هـ' : '';
 const tStamp = s => s ? fT.format(new Date(s)) : '';
 const classLabel = c => c ? `الصف ${GRADES[c.grade - 1]} / فصل ${c.section}` : '';
 const classShort = c => c ? `${GRADES[c.grade - 1]} (${c.section})` : '';
@@ -952,8 +956,9 @@ function periodBar(onChange) {
       h('div', { class: 'seg' }, PRESETS.map(([k, l]) => h('button', { class: S.preset === k ? 'on' : '', onClick: () => { S.preset = k; if (k === 'custom') { S.from = S.from || r.from; S.to = S.to || r.to; } draw(); onChange(); } }, l))),
       S.preset === 'custom' ? h('div', { class: 'row' },
         h('b', { class: 'small' }, 'من'), h('input', { type: 'date', style: { width: 'auto' }, value: S.from || '', min: t && t.start, max: t && t.end, onChange: e => { S.from = e.target.value; fix(); } }),
-        h('b', { class: 'small' }, 'إلى'), h('input', { type: 'date', style: { width: 'auto' }, value: S.to || '', min: t && t.start, max: t && t.end, onChange: e => { S.to = e.target.value; fix(); } })) :
-        (r.from ? h('span', { class: 'muted small' }, r.from === r.to ? dLong(r.from) : `${dShort(r.from)} – ${dShort(r.to)}`) : null));
+        h('b', { class: 'small' }, 'إلى'), h('input', { type: 'date', style: { width: 'auto' }, value: S.to || '', min: t && t.start, max: t && t.end, onChange: e => { S.to = e.target.value; fix(); } }),
+        r.from ? h('span', { class: 'muted small' }, `(من ${dHs(r.from)} إلى ${dHs(r.to)})`) : null) :
+        (r.from ? h('span', { class: 'muted small' }, r.from === r.to ? dHs(r.from) : `من ${dHs(r.from)} إلى ${dHs(r.to)}`) : null));
   };
   draw(); return box;
 }
@@ -1392,12 +1397,12 @@ function renderReports(main) {
   const KIND = { points: 'النقاط', value: 'القيم', practice: 'درجات السلوك المتميز' };
   const kindOf = it => it.kind === 'value' ? 'قيمة' : it.kind === 'practice' ? 'سلوك متميز' : 'نقاط';
   const head = () => { const r = range(), t = term(); return h('div', { class: 'print-head' }, h('h2', null, `${SCHOOL} — تقرير ${R.scope === 'student' ? 'الطالبة' : KIND[R.kind]}`),
-    h('p', null, `${scopeLabel()} · ${t.name} · من ${r.from} إلى ${r.to} · طُبع بتاريخ ${S.today} بواسطة ${S.user.name}`)); };
+    h('p', null, `${scopeLabel()} · ${t.name} · من ${dHs(r.from)} إلى ${dHs(r.to)} · طُبع بتاريخ ${dHs(S.today)} بواسطة ${S.user.name}`)); };
   const draw = () => {
     const { sum, recs } = data, rows = sum.rows, r = { from: sum.from, to: sum.to };
     const btns = h('div', { class: 'row noprint', style: { marginBottom: '10px' } },
-      h('div', { class: 'grow' }, h('b', null, scopeLabel()), h('span', { class: 'muted small' }, ` · ${rows.length} طالبة · ${dShort(r.from)} – ${dShort(r.to)}`), R.kind === 'practice' && R.scope !== 'student' ? h('span', { class: 'tag gold', style: { marginInlineStart: '8px' } }, 'أعداد المرات للفترة المحددة · الدرجة المحتسبة للفصل الدراسي كاملًا') : null),
-      h('span', { class: 'tag', title: 'رقم إصدار الموقع' }, 'إصدار ١٦ نوفمبر'),
+      h('div', { class: 'grow' }, h('b', null, scopeLabel()), h('span', { class: 'muted small' }, ` · ${rows.length} طالبة · من ${dHs(r.from)} إلى ${dHs(r.to)}`), R.kind === 'practice' && R.scope !== 'student' ? h('span', { class: 'tag gold', style: { marginInlineStart: '8px' } }, 'أعداد المرات للفترة المحددة · الدرجة المحتسبة للفصل الدراسي كاملًا') : null),
+      h('span', { class: 'tag', title: 'رقم إصدار الموقع' }, 'إصدار ١٩ نوفمبر'),
       h('button', { class: 'btn', onClick: () => { if (R.scope === 'student') { document.body.classList.remove('print-rep'); window.print(); } else printPaged(); } }, svg(IC.print, 16), R.scope === 'student' ? 'طباعة' : 'طباعة ' + KIND[R.kind]),
       h('button', { class: 'btn gold', onClick: exportXlsx }, svg(IC.xls, 16), R.scope === 'student' ? 'تصدير Excel' : 'Excel ' + KIND[R.kind]));
     if (R.scope === 'student') {
@@ -1414,8 +1419,8 @@ function renderReports(main) {
           h('table', { class: 't' }, h('thead', null, h('tr', null, h('th', null, 'البند'), h('th', { class: 'c' }, 'عدد المرات'))),
             h('tbody', null, used.length ? used.map(i => h('tr', null, h('td', null, i.short), h('td', { class: 'c num' }, s.counts[i.id]))) : h('tr', null, h('td', { colspan: 2, class: 'muted' }, 'لا يوجد.'))))),
         h('h3', { style: { fontSize: '15px', margin: '0 0 6px' } }, `تفاصيل الوقائع (${recs.length})`),
-        h('div', { class: 'scroll' }, h('table', { class: 't' }, h('thead', null, h('tr', null, ['التاريخ', 'القسم', 'البند', 'النقاط', 'الدرجة الرسمية', 'منحتها', 'ملاحظة'].map(x => h('th', null, x)))),
-          h('tbody', null, recs.length ? recs.map(x => { const it = item(x.item_id), c = catOf(it.cat); return h('tr', null, h('td', { class: 'num', style: { whiteSpace: 'nowrap' } }, x.date),
+        h('div', { class: 'scroll' }, h('table', { class: 't' }, h('thead', null, h('tr', null, ['التاريخ (هجري)', 'القسم', 'البند', 'النقاط', 'الدرجة الرسمية', 'منحتها', 'ملاحظة'].map(x => h('th', null, x)))),
+          h('tbody', null, recs.length ? recs.map(x => { const it = item(x.item_id), c = catOf(it.cat); return h('tr', null, h('td', { class: 'num', style: { whiteSpace: 'nowrap' } }, dH(x.date)),
             h('td', null, c ? [h('span', { class: 'dot', style: { background: c.c } }), c.name] : 'درجات فقط'), h('td', null, it.short), h('td', { class: 'num' }, x.award || '—'),
             h('td', { class: 'num' }, it.kind !== 'practice' ? '—' : (x.counts ? x.points : 'غير محتسبة')), h('td', null, x.by), h('td', null, x.note)); }) : h('tr', null, h('td', { colspan: 7, class: 'muted' }, 'لا توجد وقائع في هذه الفترة.')))))));
       return;
@@ -1459,7 +1464,7 @@ function renderReports(main) {
     put(area, pages.map((pg, k) => h('section', { class: 'pp' + (isP ? ' pr' : '') },
       h('div', { class: 'pp-h' },
         h('div', null, h('b', { class: 'pp-t' }, title), h('div', { class: 'pp-c' }, classLabel(cls(pg.cid)) + (pg.parts > 1 ? ` (${pg.part} من ${pg.parts})` : ''))),
-        h('div', { class: 'pp-m' }, h('div', null, SCHOOL + ' · ' + APP), h('div', null, `${t.name} · من ${r.from} إلى ${r.to}`), h('div', null, `طُبع ${S.today} · ${S.user.name}`))),
+        h('div', { class: 'pp-m' }, h('div', null, SCHOOL + ' · ' + APP), h('div', null, `${t.name} · من ${dHs(r.from)} إلى ${dHs(r.to)}`), h('div', null, `طُبع ${dHs(S.today)} · ${S.user.name}`))),
       h('table', { class: 'pt' }, colgroup.cloneNode(true),
         h('thead', null, h('tr', null, h('th', null, 'م'), h('th', { class: 'nm' }, 'اسم الطالبة'),
           cols.map(c => h('th', null, c.no && isP ? h('span', { class: 'pno' }, c.no) : null, c.label, c.deg && isP ? h('span', { class: 'pdeg' }, c.deg) : null)),
@@ -1484,17 +1489,17 @@ function renderReports(main) {
           ...rows.map((s, i) => [i + 1, ...base(s), ...V.map(x => s.counts[x.id] || 0), V.reduce((q, x) => q + (s.counts[x.id] || 0), 0)])] },
         { name: 'درجات السلوك المتميز', widths: [5, 34, 10, 7, ...P.map(() => 16), 14, 18, 18], rows: [['م', 'اسم الطالبة', 'الصف', 'الفصل', ...P.map(i => i.short), 'مجموع المرات', 'مجموع الدرجات المرصودة', `الدرجة المحتسبة (من ${cap})`],
           ...rows.map((s, i) => [i + 1, ...base(s), ...P.map(x => s.counts[x.id] || 0), P.reduce((q, x) => q + (s.counts[x.id] || 0), 0), s.raw, s.pts])] },
-        { name: 'تفاصيل الوقائع', widths: [12, 34, 10, 7, 16, 36, 8, 14, 12, 40, 22, 20, 22, 20], rows: [['التاريخ', 'اسم الطالبة', 'الصف', 'الفصل', 'القسم', 'البند', 'النقاط', 'الدرجة الرسمية', 'الدرجة محتسبة', 'الملاحظة', 'منحتها', 'وقت الإدخال', 'آخر تعديل بواسطة', 'وقت التعديل'],
+        { name: 'تفاصيل الوقائع', widths: [12, 34, 10, 7, 16, 36, 8, 14, 12, 40, 22, 20, 22, 20], rows: [['التاريخ (هجري)', 'اسم الطالبة', 'الصف', 'الفصل', 'القسم', 'البند', 'النقاط', 'الدرجة الرسمية', 'الدرجة محتسبة', 'الملاحظة', 'منحتها', 'وقت الإدخال', 'آخر تعديل بواسطة', 'وقت التعديل'],
           ...recs.map(x => { const it = item(x.item_id), c = cls(x.now_class), k = catOf(it.cat), pr = it.kind === 'practice';
-            return [x.date, x.student, GRADES[c.grade - 1], c.section, k ? k.name : 'درجات فقط', it.short, x.award || 0, pr ? x.points : '', pr ? (x.counts ? 'نعم' : 'لا') : '', x.note, x.by, tStamp(x.at), x.upd_by || '', tStamp(x.upd_at)]; })] },
-        { name: 'معلومات', widths: [30, 60], rows: [['البند', 'القيمة'], ['المدرسة', SCHOOL], ['النطاق', scopeLabel()], ['الفصل الدراسي', t.name], ['من تاريخ', r.from], ['إلى تاريخ', r.to], ['الحد الأعلى لدرجات السلوك المتميز', cap], ['تاريخ التصدير', S.today], ['صدّرته', S.user.name],
+            return [dH(x.date), x.student, GRADES[c.grade - 1], c.section, k ? k.name : 'درجات فقط', it.short, x.award || 0, pr ? x.points : '', pr ? (x.counts ? 'نعم' : 'لا') : '', x.note, x.by, tStamp(x.at), x.upd_by || '', tStamp(x.upd_at)]; })] },
+        { name: 'معلومات', widths: [30, 60], rows: [['البند', 'القيمة'], ['المدرسة', SCHOOL], ['النطاق', scopeLabel()], ['الفصل الدراسي', t.name], ['من تاريخ', dHs(r.from)], ['إلى تاريخ', dHs(r.to)], ['الحد الأعلى لدرجات السلوك المتميز', cap], ['تاريخ التصدير', S.today], ['صدّرته', S.user.name],
           ['ملاحظة', 'النقاط وأعداد المرات للفترة المحددة. درجة السلوك المتميز تُحتسب للفصل الدراسي كاملًا.']] }];
       if (R.scope !== 'student') {  // تصدير التقرير المختار فقط
         const pick = { points: ['النقاط', 'تفاصيل الوقائع'], value: ['القيم'], practice: ['درجات السلوك المتميز'] }[R.kind];
         const one = sheets.filter(x => pick.includes(x.name) || x.name === 'معلومات');
-        return download(xlsx(one), `${KIND[R.kind]} - ${scopeLabel().replace(/[\\/:*?"<>|]/g, '-')} ${r.from} إلى ${r.to}.xlsx`);
+        return download(xlsx(one), `${KIND[R.kind]} - ${scopeLabel().replace(/[\\/:*?"<>|]/g, '-')} ${dH(r.from, '-')} إلى ${dH(r.to, '-')}.xlsx`);
       }
-      download(xlsx(sheets), `نقاط ${scopeLabel().replace(/[\\/:*?"<>|]/g, '-')} ${r.from} إلى ${r.to}.xlsx`);
+      download(xlsx(sheets), `نقاط ${scopeLabel().replace(/[\\/:*?"<>|]/g, '-')} ${dH(r.from, '-')} إلى ${dH(r.to, '-')}.xlsx`);
     } catch (e) { oops(e); }
   }
   const drawCtl = () => {
