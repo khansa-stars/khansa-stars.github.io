@@ -500,6 +500,10 @@ th.behcol,td.behcol{text-align:center;padding-inline:10px;white-space:nowrap}
 .grid th.item.pfull{min-width:150px;max-width:170px;width:160px;vertical-align:bottom;padding:8px 8px}
 .grid th.item.pfull .pg-hno{display:inline-grid;margin-bottom:4px}
 .grid th.item.pfull .pg-ht{display:block;font-size:13.5px;line-height:1.5;font-weight:600;color:var(--ink);white-space:normal}
+
+.hpick{display:inline-flex;gap:6px;align-items:center}
+.hpick select{width:auto;min-width:0;padding-inline:.6em}
+.hpick select:first-child{min-width:64px}
 </style>
 </head>
 <body>
@@ -943,6 +947,27 @@ async function loadSummary(silent) {
   } catch (e) { if (!silent && !e.session) oops(e); }
 }
 
+// اختيار تاريخ هجري (يوم + شهر) ضمن الفصل الدراسي، ويُحوَّل داخليًا إلى الميلادي
+const HMONTHS = ['محرم', 'صفر', 'ربيع الأول', 'ربيع الآخر', 'جمادى الأولى', 'جمادى الآخرة', 'رجب', 'شعبان', 'رمضان', 'شوال', 'ذو القعدة', 'ذو الحجة'];
+const _hd = {};
+function hDays(t) {
+  const k = t.start + t.end; if (_hd[k]) return _hd[k];
+  const L = []; for (let d = pd(t.start); iso(d) <= t.end; d.setUTCDate(d.getUTCDate() + 1)) { const x = iso(d), [y, m, dd] = dH(x).split('/').map(Number); L.push({ iso: x, y, m, d: dd }); }
+  return (_hd[k] = L);
+}
+function hPick(val, onPick) {
+  const t = term(); if (!t || !fHn) return h('input', { type: 'date', style: { width: 'auto' }, value: val || '', onChange: e => onPick(e.target.value) });
+  const L = hDays(t); let cur = L.find(x => x.iso === val) || L[0];
+  const box = h('span', { class: 'hpick' });
+  const draw = () => {
+    const months = [...new Map(L.map(x => [x.y * 100 + x.m, x])).values()], days = L.filter(x => x.y === cur.y && x.m === cur.m);
+    put(box,
+      h('select', { 'aria-label': 'اليوم', value: cur.iso, onChange: e => { cur = L.find(x => x.iso === e.target.value); onPick(cur.iso); } }, days.map(x => h('option', { value: x.iso }, x.d))),
+      h('select', { 'aria-label': 'الشهر', value: String(cur.y * 100 + cur.m), onChange: e => { const k = +e.target.value, inM = L.filter(x => x.y * 100 + x.m === k); cur = inM.find(x => x.d === cur.d) || inM[inM.length - 1]; draw(); onPick(cur.iso); } },
+        months.map(x => h('option', { value: String(x.y * 100 + x.m) }, `${HMONTHS[x.m - 1]} ${x.y} هـ`))));
+  };
+  draw(); return box;
+}
 function periodBar(onChange) {
   const box = h('div', { class: 'toolbar' });
   // إذا كُتب تاريخ البداية بعد تاريخ النهاية نبدّلهما تلقائيًا
@@ -955,9 +980,8 @@ function periodBar(onChange) {
         S.terms.map(x => h('option', { value: x.id }, x.name))) : h('span', { class: 'tag ok' }, t ? t.name : '—'),
       h('div', { class: 'seg' }, PRESETS.map(([k, l]) => h('button', { class: S.preset === k ? 'on' : '', onClick: () => { S.preset = k; if (k === 'custom') { S.from = S.from || r.from; S.to = S.to || r.to; } draw(); onChange(); } }, l))),
       S.preset === 'custom' ? h('div', { class: 'row' },
-        h('b', { class: 'small' }, 'من'), h('input', { type: 'date', style: { width: 'auto' }, value: S.from || '', min: t && t.start, max: t && t.end, onChange: e => { S.from = e.target.value; fix(); } }),
-        h('b', { class: 'small' }, 'إلى'), h('input', { type: 'date', style: { width: 'auto' }, value: S.to || '', min: t && t.start, max: t && t.end, onChange: e => { S.to = e.target.value; fix(); } }),
-        r.from ? h('span', { class: 'muted small' }, `(من ${dHs(r.from)} إلى ${dHs(r.to)})`) : null) :
+        h('b', { class: 'small' }, 'من'), hPick(S.from || r.from, v => { S.from = v; fix(); }),
+        h('b', { class: 'small' }, 'إلى'), hPick(S.to || r.to, v => { S.to = v; fix(); })) :
         (r.from ? h('span', { class: 'muted small' }, r.from === r.to ? dHs(r.from) : `من ${dHs(r.from)} إلى ${dHs(r.to)}`) : null));
   };
   draw(); return box;
@@ -1402,7 +1426,7 @@ function renderReports(main) {
     const { sum, recs } = data, rows = sum.rows, r = { from: sum.from, to: sum.to };
     const btns = h('div', { class: 'row noprint', style: { marginBottom: '10px' } },
       h('div', { class: 'grow' }, h('b', null, scopeLabel()), h('span', { class: 'muted small' }, ` · ${rows.length} طالبة · من ${dHs(r.from)} إلى ${dHs(r.to)}`), R.kind === 'practice' && R.scope !== 'student' ? h('span', { class: 'tag gold', style: { marginInlineStart: '8px' } }, 'أعداد المرات للفترة المحددة · الدرجة المحتسبة للفصل الدراسي كاملًا') : null),
-      h('span', { class: 'tag', title: 'رقم إصدار الموقع' }, 'إصدار ١٩ نوفمبر'),
+      h('span', { class: 'tag', title: 'رقم إصدار الموقع' }, 'إصدار ١٩ نوفمبر (٢)'),
       h('button', { class: 'btn', onClick: () => { if (R.scope === 'student') { document.body.classList.remove('print-rep'); window.print(); } else printPaged(); } }, svg(IC.print, 16), R.scope === 'student' ? 'طباعة' : 'طباعة ' + KIND[R.kind]),
       h('button', { class: 'btn gold', onClick: exportXlsx }, svg(IC.xls, 16), R.scope === 'student' ? 'تصدير Excel' : 'Excel ' + KIND[R.kind]));
     if (R.scope === 'student') {
